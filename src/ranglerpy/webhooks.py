@@ -5,9 +5,10 @@ import hmac
 import json
 from hashlib import sha256
 import time
-from typing import Mapping
+from typing import Literal, Mapping
 
-from .exceptions import InvalidSignatureError
+from .exceptions import DuplicateEventError, InvalidSignatureError
+from .idempotency import IdempotencyStore
 from .models import EventEnvelope
 
 
@@ -85,6 +86,8 @@ def parse_and_verify_webhook(
     raw_body: bytes,
     secret: str,
     max_age_seconds: int | None = 300,
+    idempotency_store: IdempotencyStore | None = None,
+    idempotency_key: Literal["event_id", "webhook_id"] = "event_id",
 ) -> EventEnvelope:
     webhook_id, webhook_timestamp, signature = extract_webhook_headers(headers)
     is_valid = verify_webhook_signature(
@@ -97,4 +100,9 @@ def parse_and_verify_webhook(
     )
     if not is_valid:
         raise InvalidSignatureError("Atlas webhook signature verification failed")
-    return parse_webhook_event(raw_body)
+    event = parse_webhook_event(raw_body)
+    if idempotency_store is not None:
+        key = event.id if idempotency_key == "event_id" else webhook_id
+        if not idempotency_store.claim(key):
+            raise DuplicateEventError(f"Atlas webhook already processed for key: {key}")
+    return event

@@ -7,11 +7,12 @@ import unittest
 
 from ranglerpy import (
     compute_webhook_signature,
+    InMemoryIdempotencyStore,
     parse_and_verify_webhook,
     parse_webhook_event,
     verify_webhook_signature,
 )
-from ranglerpy.exceptions import InvalidSignatureError
+from ranglerpy.exceptions import DuplicateEventError, InvalidSignatureError
 
 
 class WebhookHelperTests(unittest.TestCase):
@@ -106,6 +107,54 @@ class WebhookHelperTests(unittest.TestCase):
                 headers={"Webhook-Id": "wh_123"},
                 raw_body=b"{}",
                 secret="plain-test-secret",
+            )
+
+    def test_parse_and_verify_webhook_detects_duplicate_event(self) -> None:
+        raw_body = json.dumps(
+            {
+                "id": "evt_123",
+                "type": "filing.new",
+                "occurred_at": "2026-04-12T20:00:00Z",
+                "entity_kind": "filing",
+                "entity_id": "filing_123",
+                "company_id": None,
+                "fund_id": None,
+                "title": "Test filing",
+                "summary": "Test summary",
+                "severity": "info",
+                "source_url": None,
+                "source_published_at": None,
+                "data": {},
+            }
+        ).encode("utf-8")
+        webhook_timestamp = str(int(time.time()))
+        signature = compute_webhook_signature(
+            raw_body=raw_body,
+            secret="plain-test-secret",
+            webhook_id="wh_123",
+            webhook_timestamp=webhook_timestamp,
+        )
+        headers = {
+            "Webhook-Id": "wh_123",
+            "Webhook-Timestamp": webhook_timestamp,
+            "Webhook-Signature": signature,
+        }
+        store = InMemoryIdempotencyStore()
+
+        event = parse_and_verify_webhook(
+            headers=headers,
+            raw_body=raw_body,
+            secret="plain-test-secret",
+            idempotency_store=store,
+        )
+        self.assertEqual(event.id, "evt_123")
+
+        with self.assertRaises(DuplicateEventError):
+            parse_and_verify_webhook(
+                headers=headers,
+                raw_body=raw_body,
+                secret="plain-test-secret",
+                idempotency_store=store,
             )
 
 

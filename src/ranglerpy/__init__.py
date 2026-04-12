@@ -1,11 +1,21 @@
 from .exceptions import (
     APIError,
     AuthenticationError,
+    DuplicateEventError,
     InvalidSignatureError,
     RanglerError,
     WebhookVerificationError,
 )
+from .idempotency import IdempotencyStore, InMemoryIdempotencyStore
 from .models import EventEnvelope, EventsPage
+from .polling import (
+    AsyncPollingConsumer,
+    CursorStore,
+    FileCursorStore,
+    InMemoryCursorStore,
+    PollingCheckpoint,
+    PollingConsumer,
+)
 from .webhooks import (
     compute_webhook_signature,
     extract_webhook_headers,
@@ -18,9 +28,18 @@ __all__ = [
     "APIError",
     "AuthenticationError",
     "AsyncRanglerClient",
+    "AsyncPollingConsumer",
+    "CursorStore",
+    "DuplicateEventError",
     "EventEnvelope",
     "EventsPage",
+    "FileCursorStore",
+    "IdempotencyStore",
+    "InMemoryCursorStore",
+    "InMemoryIdempotencyStore",
     "InvalidSignatureError",
+    "PollingCheckpoint",
+    "PollingConsumer",
     "RanglerClient",
     "RanglerError",
     "WebhookVerificationError",

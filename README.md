@@ -38,31 +38,39 @@ pip install -e .[dev]
 ### Data plane: polling events
 
 ```python
-from ranglerpy import RanglerClient
+from ranglerpy import InMemoryCursorStore, PollingConsumer, RanglerClient
 
 client = RanglerClient(
     api_key="atl_test_your_api_key",
     environment="sandbox",
 )
 
-page = client.events.list(limit=25)
-for event in page.items:
-    print(event.type, event.title)
+consumer = PollingConsumer(
+    client.events,
+    cursor_store=InMemoryCursorStore(),
+    stream="market-wide-filings",
+)
 
-for event in client.events.iter_all(limit=100, event_types=["filing.new"]):
-    print(event.id, event.type)
+for event in consumer.poll(event_types=["filing.new"], limit=100):
+    print(event.id, event.type, event.occurred_at.isoformat())
 ```
 
 ### Async polling
 
 ```python
-from ranglerpy import AsyncRanglerClient
+from ranglerpy import AsyncPollingConsumer, AsyncRanglerClient, FileCursorStore
 
 async with AsyncRanglerClient(
     api_key="atl_test_your_api_key",
     environment="sandbox",
 ) as client:
-    async for event in client.events.iter_all(
+    consumer = AsyncPollingConsumer(
+        client.events,
+        cursor_store=FileCursorStore(".atlas-cursors.json"),
+        stream="issuer-monitoring",
+    )
+
+    for event in await consumer.poll(
         limit=100,
         event_types=["filing.new"],
     ):
@@ -95,12 +103,15 @@ print(webhook["signing_secret"])
 ### Webhook verification
 
 ```python
-from ranglerpy import parse_and_verify_webhook
+from ranglerpy import InMemoryIdempotencyStore, parse_and_verify_webhook
+
+idempotency_store = InMemoryIdempotencyStore()
 
 event = parse_and_verify_webhook(
     headers=headers,
     raw_body=raw_body,
     secret=webhook_secret,
+    idempotency_store=idempotency_store,
 )
 
 print(event.type, event.title)
@@ -111,9 +122,10 @@ print(event.type, event.title)
 ```python
 from fastapi import FastAPI, HTTPException, Request
 
-from ranglerpy import InvalidSignatureError, parse_and_verify_webhook
+from ranglerpy import DuplicateEventError, InMemoryIdempotencyStore, InvalidSignatureError, parse_and_verify_webhook
 
 app = FastAPI()
+store = InMemoryIdempotencyStore()
 
 
 @app.post("/atlas/webhooks")
@@ -125,9 +137,12 @@ async def atlas_webhook(request: Request):
             headers=request.headers,
             raw_body=raw_body,
             secret="whsec_your_secret",
+            idempotency_store=store,
         )
     except InvalidSignatureError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except DuplicateEventError:
+        return {"duplicate": True}
 
     return {"received": event.id}
 ```
@@ -137,9 +152,10 @@ async def atlas_webhook(request: Request):
 ```python
 from flask import Flask, jsonify, request
 
-from ranglerpy import InvalidSignatureError, parse_and_verify_webhook
+from ranglerpy import DuplicateEventError, InMemoryIdempotencyStore, InvalidSignatureError, parse_and_verify_webhook
 
 app = Flask(__name__)
+store = InMemoryIdempotencyStore()
 
 
 @app.post("/atlas/webhooks")
@@ -151,9 +167,12 @@ def atlas_webhook():
             headers=request.headers,
             raw_body=raw_body,
             secret="whsec_your_secret",
+            idempotency_store=store,
         )
     except InvalidSignatureError as exc:
         return jsonify({"error": str(exc)}), 400
+    except DuplicateEventError:
+        return jsonify({"duplicate": True}), 200
 
     return jsonify({"received": event.id})
 ```
@@ -187,9 +206,11 @@ Atlas has two auth modes:
 ### Helpers
 
 - cursor-based event iteration
+- polling consumer with checkpoint persistence
 - Atlas webhook signature verification
 - webhook payload parsing
 - parse-and-verify helper for webhook receivers
+- in-memory idempotency helper for duplicate webhook handling
 - async client support
 
 ## Notes

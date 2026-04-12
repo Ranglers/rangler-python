@@ -21,6 +21,10 @@ class InvalidSignatureError(WebhookVerificationError):
     """Raised when a webhook signature cannot be verified."""
 
 
+class DuplicateEventError(RanglerError):
+    """Raised when an event has already been processed by the integration."""
+
+
 class APIError(RanglerError):
     """Raised when Atlas returns a non-success response."""
 
