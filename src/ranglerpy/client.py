@@ -4,12 +4,14 @@ from typing import Any
 
 import httpx
 
+from ._version import __version__
 from .exceptions import APIError, AuthenticationError
 from .resources import (
     APIKeysResource,
     CompaniesResource,
     EventsResource,
     FilingsResource,
+    FundsResource,
     OrganizationsResource,
     SubscriptionsResource,
     UsageResource,
@@ -19,6 +21,7 @@ from .resources.async_api_keys import AsyncAPIKeysResource
 from .resources.async_companies import AsyncCompaniesResource
 from .resources.async_events import AsyncEventsResource
 from .resources.async_filings import AsyncFilingsResource
+from .resources.async_funds import AsyncFundsResource
 from .resources.async_organizations import AsyncOrganizationsResource
 from .resources.async_subscriptions import AsyncSubscriptionsResource
 from .resources.async_usage import AsyncUsageResource
@@ -37,7 +40,7 @@ class RanglerClient:
         base_url: str | None = None,
         environment: str = "live",
         timeout: float = 30.0,
-        user_agent: str = "ranglerpy/0.1.0",
+        user_agent: str = f"ranglerpy/{__version__}",
     ) -> None:
         if environment not in {"live", "sandbox"}:
             raise ValueError("environment must be 'live' or 'sandbox'")
@@ -61,6 +64,7 @@ class RanglerClient:
         self.companies = CompaniesResource(self)
         self.events = EventsResource(self)
         self.filings = FilingsResource(self)
+        self.funds = FundsResource(self)
         self.organizations = OrganizationsResource(self)
         self.api_keys = APIKeysResource(self)
         self.usage = UsageResource(self)
@@ -123,7 +127,7 @@ class AsyncRanglerClient:
         base_url: str | None = None,
         environment: str = "live",
         timeout: float = 30.0,
-        user_agent: str = "ranglerpy/0.1.0",
+        user_agent: str = f"ranglerpy/{__version__}",
     ) -> None:
         if environment not in {"live", "sandbox"}:
             raise ValueError("environment must be 'live' or 'sandbox'")
@@ -147,6 +151,7 @@ class AsyncRanglerClient:
         self.companies = AsyncCompaniesResource(self)
         self.events = AsyncEventsResource(self)
         self.filings = AsyncFilingsResource(self)
+        self.funds = AsyncFundsResource(self)
         self.organizations = AsyncOrganizationsResource(self)
         self.api_keys = AsyncAPIKeysResource(self)
         self.usage = AsyncUsageResource(self)

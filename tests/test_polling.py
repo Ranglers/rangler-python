@@ -130,6 +130,140 @@ class PollingConsumerTests(unittest.TestCase):
         self.assertEqual([event.id for event in second_batch], ["evt_4"])
         self.assertEqual(client.calls[2][3]["from"], "2026-04-12T21:00:00+00:00")
 
+    def test_polling_consumer_supports_company_scoped_streams(self) -> None:
+        client = _FakeEventsClient()
+        client.responses = [
+            {
+                "items": [
+                    {
+                        "id": "evt_c2",
+                        "type": "dividend.declared",
+                        "occurred_at": "2026-04-12T22:00:00Z",
+                        "entity_kind": "filing",
+                        "entity_id": "filing_c2",
+                        "company_id": "company_123",
+                        "fund_id": None,
+                        "title": "Dividend declared",
+                        "summary": "Second company event",
+                        "severity": "info",
+                        "source_url": None,
+                        "source_published_at": None,
+                        "data": {},
+                    },
+                    {
+                        "id": "evt_c1",
+                        "type": "filing.new",
+                        "occurred_at": "2026-04-12T21:00:00Z",
+                        "entity_kind": "filing",
+                        "entity_id": "filing_c1",
+                        "company_id": "company_123",
+                        "fund_id": None,
+                        "title": "Filing published",
+                        "summary": "First company event",
+                        "severity": "info",
+                        "source_url": None,
+                        "source_published_at": None,
+                        "data": {},
+                    },
+                ],
+                "next_cursor": None,
+            },
+            {
+                "items": [
+                    {
+                        "id": "evt_c3",
+                        "type": "board_change.detected",
+                        "occurred_at": "2026-04-12T23:00:00Z",
+                        "entity_kind": "filing",
+                        "entity_id": "filing_c3",
+                        "company_id": "company_123",
+                        "fund_id": None,
+                        "title": "Board changes detected",
+                        "summary": "Third company event",
+                        "severity": "info",
+                        "source_url": None,
+                        "source_published_at": None,
+                        "data": {},
+                    },
+                    {
+                        "id": "evt_c2",
+                        "type": "dividend.declared",
+                        "occurred_at": "2026-04-12T22:00:00Z",
+                        "entity_kind": "filing",
+                        "entity_id": "filing_c2",
+                        "company_id": "company_123",
+                        "fund_id": None,
+                        "title": "Dividend declared",
+                        "summary": "Second company event",
+                        "severity": "info",
+                        "source_url": None,
+                        "source_published_at": None,
+                        "data": {},
+                    },
+                ],
+                "next_cursor": None,
+            },
+        ]
+        resource = EventsResource(client)
+        store = InMemoryCursorStore()
+        consumer = PollingConsumer(resource, cursor_store=store, stream="issuers")
+
+        first_batch = consumer.poll_company("company_123", limit=50)
+        second_batch = consumer.poll_company("company_123", limit=50)
+
+        self.assertEqual([event.id for event in first_batch], ["evt_c1", "evt_c2"])
+        self.assertEqual([event.id for event in second_batch], ["evt_c3"])
+        self.assertEqual(client.calls[0][1], "/companies/company_123/events")
+        self.assertEqual(client.calls[1][3]["from"], "2026-04-12T22:00:00+00:00")
+
+    def test_polling_consumer_supports_fund_scoped_streams(self) -> None:
+        client = _FakeEventsClient()
+        client.responses = [
+            {
+                "items": [
+                    {
+                        "id": "evt_f2",
+                        "type": "fund.disclosure.updated",
+                        "occurred_at": "2026-04-12T22:00:00Z",
+                        "entity_kind": "fund",
+                        "entity_id": "fund_123",
+                        "company_id": None,
+                        "fund_id": "fund_123",
+                        "title": "Fund disclosure updated",
+                        "summary": "Second fund event",
+                        "severity": "info",
+                        "source_url": None,
+                        "source_published_at": None,
+                        "data": {},
+                    },
+                    {
+                        "id": "evt_f1",
+                        "type": "fund.snapshot.updated",
+                        "occurred_at": "2026-04-12T21:00:00Z",
+                        "entity_kind": "fund",
+                        "entity_id": "fund_123",
+                        "company_id": None,
+                        "fund_id": "fund_123",
+                        "title": "Fund snapshot updated",
+                        "summary": "First fund event",
+                        "severity": "info",
+                        "source_url": None,
+                        "source_published_at": None,
+                        "data": {},
+                    },
+                ],
+                "next_cursor": None,
+            }
+        ]
+        resource = EventsResource(client)
+        store = InMemoryCursorStore()
+        consumer = PollingConsumer(resource, cursor_store=store, stream="funds")
+
+        batch = consumer.poll_fund("fund_123", limit=50)
+
+        self.assertEqual([event.id for event in batch], ["evt_f1", "evt_f2"])
+        self.assertEqual(client.calls[0][1], "/funds/fund_123/events")
+
 
 if __name__ == "__main__":
     unittest.main()

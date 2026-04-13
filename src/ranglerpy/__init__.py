@@ -1,3 +1,4 @@
+from ._version import __version__
 from .exceptions import (
     APIError,
     AuthenticationError,
@@ -49,8 +50,6 @@ __all__ = [
     "parse_webhook_event",
     "verify_webhook_signature",
 ]
-
-__version__ = "0.1.0"
 
 
 def __getattr__(name: str):

@@ -50,6 +50,8 @@ class RanglerClientTests(unittest.TestCase):
         client = RanglerClient(api_key="atl_test_123", environment="sandbox")
         try:
             self.assertEqual(client.base_url, "https://sandbox-api.rangler.co/v1")
+            self.assertEqual(client._http.headers["User-Agent"], "ranglerpy/0.1.0")
+            self.assertTrue(hasattr(client, "funds"))
         finally:
             client.close()
 
@@ -64,6 +66,8 @@ class RanglerClientTests(unittest.TestCase):
     def test_async_client_uses_sandbox_base_url(self) -> None:
         client = AsyncRanglerClient(api_key="atl_test_123", environment="sandbox")
         self.assertEqual(client.base_url, "https://sandbox-api.rangler.co/v1")
+        self.assertEqual(client._http.headers["User-Agent"], "ranglerpy/0.1.0")
+        self.assertTrue(hasattr(client, "funds"))
 
 
 if __name__ == "__main__":

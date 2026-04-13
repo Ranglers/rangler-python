@@ -192,6 +192,7 @@ Atlas has two auth modes:
 
 - companies
 - filings
+- funds
 - event feeds
 
 ### Control plane
@@ -212,6 +213,17 @@ Atlas has two auth modes:
 - parse-and-verify helper for webhook receivers
 - in-memory idempotency helper for duplicate webhook handling
 - async client support
+
+## Example scripts
+
+The repo includes runnable examples in [`examples/`](./examples):
+
+- [`poll_market_events.py`](./examples/poll_market_events.py) for market-wide event polling
+- [`poll_company_events.py`](./examples/poll_company_events.py) for issuer-scoped polling
+- [`poll_fund_events.py`](./examples/poll_fund_events.py) for fund-scoped polling
+- [`fastapi_webhook_receiver.py`](./examples/fastapi_webhook_receiver.py) for a minimal webhook receiver
+
+These are intentionally small. They are meant to be copied into a real worker, cron job, or receiver and then adapted to your own storage and job queue.
 
 ## Notes
 

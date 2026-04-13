@@ -27,6 +27,12 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
+[project.urls]
+Documentation = "https://docs.rangler.co/docs/sdks"
+Homepage = "https://docs.rangler.co/docs"
+Repository = "https://github.com/smyja/rangler-python"
+Issues = "https://github.com/smyja/rangler-python/issues"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0,<9.0",

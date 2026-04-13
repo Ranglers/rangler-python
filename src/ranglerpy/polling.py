@@ -151,6 +151,50 @@ class PollingConsumer:
             self.cursor_store.save(self.stream, next_checkpoint)
         return list(reversed(filtered))
 
+    def poll_company(
+        self,
+        company_id: str,
+        *,
+        event_types: list[str] | None = None,
+        from_: datetime | str | None = None,
+        to: datetime | str | None = None,
+        limit: int = 100,
+    ) -> list[EventEnvelope]:
+        return self._poll_scoped(
+            scope_key=f"company:{company_id}",
+            fetch_page=lambda cursor, effective_from: self.events_resource.list_company(
+                company_id,
+                cursor=cursor,
+                event_types=event_types,
+                from_=effective_from,
+                to=to,
+                limit=limit,
+            ),
+            from_=from_,
+        )
+
+    def poll_fund(
+        self,
+        fund_id: str,
+        *,
+        event_types: list[str] | None = None,
+        from_: datetime | str | None = None,
+        to: datetime | str | None = None,
+        limit: int = 100,
+    ) -> list[EventEnvelope]:
+        return self._poll_scoped(
+            scope_key=f"fund:{fund_id}",
+            fetch_page=lambda cursor, effective_from: self.events_resource.list_fund(
+                fund_id,
+                cursor=cursor,
+                event_types=event_types,
+                from_=effective_from,
+                to=to,
+                limit=limit,
+            ),
+            from_=from_,
+        )
+
     @staticmethod
     def _filter_seen(
         events: list[EventEnvelope],
@@ -167,6 +211,39 @@ class PollingConsumer:
                 continue
             filtered.append(event)
         return filtered
+
+    def _poll_scoped(
+        self,
+        *,
+        scope_key: str,
+        fetch_page: Any,
+        from_: datetime | str | None,
+    ) -> list[EventEnvelope]:
+        stream = f"{self.stream}:{scope_key}"
+        checkpoint = self.cursor_store.load(stream)
+        explicit_from = _coerce_datetime(from_)
+        effective_from = explicit_from
+        if checkpoint is not None and (
+            explicit_from is None or checkpoint.latest_occurred_at > explicit_from
+        ):
+            effective_from = checkpoint.latest_occurred_at
+
+        cursor: str | None = None
+        fetched: list[EventEnvelope] = []
+        while True:
+            page = fetch_page(cursor, effective_from)
+            if not page.items:
+                break
+            fetched.extend(page.items)
+            if not page.next_cursor:
+                break
+            cursor = page.next_cursor
+
+        filtered = self._filter_seen(fetched, checkpoint)
+        next_checkpoint = _build_checkpoint(fetched)
+        if next_checkpoint is not None:
+            self.cursor_store.save(stream, next_checkpoint)
+        return list(reversed(filtered))
 
 
 class AsyncPollingConsumer:
@@ -216,4 +293,81 @@ class AsyncPollingConsumer:
         next_checkpoint = _build_checkpoint(fetched)
         if next_checkpoint is not None:
             self.cursor_store.save(self.stream, next_checkpoint)
+        return list(reversed(filtered))
+
+    async def poll_company(
+        self,
+        company_id: str,
+        *,
+        event_types: list[str] | None = None,
+        from_: datetime | str | None = None,
+        to: datetime | str | None = None,
+        limit: int = 100,
+    ) -> list[EventEnvelope]:
+        return await self._poll_scoped(
+            scope_key=f"company:{company_id}",
+            fetch_page=lambda cursor, effective_from: self.events_resource.list_company(
+                company_id,
+                cursor=cursor,
+                event_types=event_types,
+                from_=effective_from,
+                to=to,
+                limit=limit,
+            ),
+            from_=from_,
+        )
+
+    async def poll_fund(
+        self,
+        fund_id: str,
+        *,
+        event_types: list[str] | None = None,
+        from_: datetime | str | None = None,
+        to: datetime | str | None = None,
+        limit: int = 100,
+    ) -> list[EventEnvelope]:
+        return await self._poll_scoped(
+            scope_key=f"fund:{fund_id}",
+            fetch_page=lambda cursor, effective_from: self.events_resource.list_fund(
+                fund_id,
+                cursor=cursor,
+                event_types=event_types,
+                from_=effective_from,
+                to=to,
+                limit=limit,
+            ),
+            from_=from_,
+        )
+
+    async def _poll_scoped(
+        self,
+        *,
+        scope_key: str,
+        fetch_page: Any,
+        from_: datetime | str | None,
+    ) -> list[EventEnvelope]:
+        stream = f"{self.stream}:{scope_key}"
+        checkpoint = self.cursor_store.load(stream)
+        explicit_from = _coerce_datetime(from_)
+        effective_from = explicit_from
+        if checkpoint is not None and (
+            explicit_from is None or checkpoint.latest_occurred_at > explicit_from
+        ):
+            effective_from = checkpoint.latest_occurred_at
+
+        cursor: str | None = None
+        fetched: list[EventEnvelope] = []
+        while True:
+            page = await fetch_page(cursor, effective_from)
+            if not page.items:
+                break
+            fetched.extend(page.items)
+            if not page.next_cursor:
+                break
+            cursor = page.next_cursor
+
+        filtered = PollingConsumer._filter_seen(fetched, checkpoint)
+        next_checkpoint = _build_checkpoint(fetched)
+        if next_checkpoint is not None:
+            self.cursor_store.save(stream, next_checkpoint)
         return list(reversed(filtered))
