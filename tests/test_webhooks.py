@@ -22,10 +22,13 @@ class WebhookHelperTests(unittest.TestCase):
                 "id": "evt_123",
                 "type": "filing.new",
                 "occurred_at": "2026-04-12T20:00:00Z",
+                "created_at": "2026-04-12T20:00:01Z",
                 "entity_kind": "filing",
                 "entity_id": "filing_123",
                 "company_id": None,
                 "fund_id": None,
+                "source_kind": "filing",
+                "source_id": "filing_123",
                 "title": "Test filing",
                 "summary": "Test summary",
                 "severity": "info",
@@ -56,7 +59,7 @@ class WebhookHelperTests(unittest.TestCase):
         )
 
     def test_verify_webhook_signature_rejects_stale_timestamp(self) -> None:
-        raw_body = b'{"id":"evt_123","type":"filing.new","occurred_at":"2026-04-12T20:00:00Z","entity_kind":"filing","entity_id":"filing_123","company_id":null,"fund_id":null,"title":"Test filing","summary":"Test summary","severity":"info","source_url":null,"source_published_at":null,"data":{}}'
+        raw_body = b'{"id":"evt_123","type":"filing.new","occurred_at":"2026-04-12T20:00:00Z","created_at":"2026-04-12T20:00:01Z","entity_kind":"filing","entity_id":"filing_123","company_id":null,"fund_id":null,"source_kind":"filing","source_id":"filing_123","title":"Test filing","summary":"Test summary","severity":"info","source_url":null,"source_published_at":null,"data":{}}'
         secret = "plain-test-secret"
         webhook_id = "wh_123"
         webhook_timestamp = str(int(time.time()) - 3600)
@@ -83,10 +86,13 @@ class WebhookHelperTests(unittest.TestCase):
                 "id": "evt_123",
                 "type": "fund.disclosure.updated",
                 "occurred_at": "2026-04-12T20:00:00Z",
+                "created_at": "2026-04-12T20:00:01Z",
                 "entity_kind": "fund",
                 "entity_id": "fund_123",
                 "company_id": None,
                 "fund_id": "fund_123",
+                "source_kind": "fund_snapshot",
+                "source_id": "snapshot_123",
                 "title": "Fund disclosure updated",
                 "summary": "Latest factsheet posted",
                 "severity": "info",
@@ -99,6 +105,9 @@ class WebhookHelperTests(unittest.TestCase):
         event = parse_webhook_event(raw_body)
         self.assertEqual(event.type, "fund.disclosure.updated")
         self.assertEqual(event.fund_id, "fund_123")
+        self.assertEqual(event.created_at.year, 2026)
+        self.assertEqual(event.source_kind, "fund_snapshot")
+        self.assertEqual(event.source_id, "snapshot_123")
         self.assertEqual(event.occurred_at.year, 2026)
 
     def test_parse_and_verify_webhook_raises_for_missing_headers(self) -> None:
@@ -115,10 +124,13 @@ class WebhookHelperTests(unittest.TestCase):
                 "id": "evt_123",
                 "type": "filing.new",
                 "occurred_at": "2026-04-12T20:00:00Z",
+                "created_at": "2026-04-12T20:00:01Z",
                 "entity_kind": "filing",
                 "entity_id": "filing_123",
                 "company_id": None,
                 "fund_id": None,
+                "source_kind": "filing",
+                "source_id": "filing_123",
                 "title": "Test filing",
                 "summary": "Test summary",
                 "severity": "info",

@@ -16,6 +16,7 @@ class EventEnvelope:
     id: str
     type: str
     occurred_at: datetime
+    created_at: datetime
     entity_kind: str
     entity_id: str
     title: str
@@ -23,6 +24,8 @@ class EventEnvelope:
     severity: str
     company_id: str | None
     fund_id: str | None
+    source_kind: str
+    source_id: str
     source_url: str | None
     source_published_at: datetime | None
     data: dict[str, Any]
@@ -33,6 +36,7 @@ class EventEnvelope:
             id=str(payload["id"]),
             type=str(payload["type"]),
             occurred_at=_parse_datetime(str(payload["occurred_at"])),
+            created_at=_parse_datetime(str(payload["created_at"])),
             entity_kind=str(payload["entity_kind"]),
             entity_id=str(payload["entity_id"]),
             title=str(payload["title"]),
@@ -40,6 +44,8 @@ class EventEnvelope:
             severity=str(payload["severity"]),
             company_id=str(payload["company_id"]) if payload.get("company_id") else None,
             fund_id=str(payload["fund_id"]) if payload.get("fund_id") else None,
+            source_kind=str(payload["source_kind"]),
+            source_id=str(payload["source_id"]),
             source_url=payload.get("source_url"),
             source_published_at=_parse_datetime(payload.get("source_published_at")),
             data=dict(payload.get("data") or {}),
