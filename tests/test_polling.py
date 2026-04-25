@@ -10,7 +10,7 @@ class _FakeEventsClient:
         self.calls = []
         self.responses = [
             {
-                "items": [
+                "data": [
                     {
                         "id": "evt_3",
                         "type": "filing.new",
@@ -51,7 +51,7 @@ class _FakeEventsClient:
                 "next_cursor": "cursor_2",
             },
             {
-                "items": [
+                "data": [
                     {
                         "id": "evt_1",
                         "type": "filing.new",
@@ -74,7 +74,7 @@ class _FakeEventsClient:
                 "next_cursor": None,
             },
             {
-                "items": [
+                "data": [
                     {
                         "id": "evt_4",
                         "type": "filing.new",
@@ -122,6 +122,15 @@ class _FakeEventsClient:
 
 
 class PollingConsumerTests(unittest.TestCase):
+    def test_events_resource_auto_paging_iter_returns_all_pages(self) -> None:
+        client = _FakeEventsClient()
+        resource = EventsResource(client)
+
+        events = list(resource.auto_paging_iter(limit=2))
+
+        self.assertEqual([event.id for event in events], ["evt_3", "evt_2", "evt_1"])
+        self.assertEqual(client.calls[1][3]["cursor"], "cursor_2")
+
     def test_polling_consumer_returns_oldest_first_and_persists_checkpoint(self) -> None:
         client = _FakeEventsClient()
         resource = EventsResource(client)
@@ -149,7 +158,7 @@ class PollingConsumerTests(unittest.TestCase):
         client = _FakeEventsClient()
         client.responses = [
             {
-                "items": [
+                "data": [
                     {
                         "id": "evt_c2",
                         "type": "dividend.declared",
@@ -190,7 +199,7 @@ class PollingConsumerTests(unittest.TestCase):
                 "next_cursor": None,
             },
             {
-                "items": [
+                "data": [
                     {
                         "id": "evt_c3",
                         "type": "board_change.detected",
@@ -247,7 +256,7 @@ class PollingConsumerTests(unittest.TestCase):
         client = _FakeEventsClient()
         client.responses = [
             {
-                "items": [
+                "data": [
                     {
                         "id": "evt_f2",
                         "type": "fund.disclosure.updated",

@@ -138,9 +138,9 @@ class PollingConsumer:
                 to=to,
                 limit=limit,
             )
-            if not page.items:
+            if not page.data:
                 break
-            fetched.extend(page.items)
+            fetched.extend(page.data)
             if not page.next_cursor:
                 break
             cursor = page.next_cursor
@@ -232,9 +232,9 @@ class PollingConsumer:
         fetched: list[EventEnvelope] = []
         while True:
             page = fetch_page(cursor, effective_from)
-            if not page.items:
+            if not page.data:
                 break
-            fetched.extend(page.items)
+            fetched.extend(page.data)
             if not page.next_cursor:
                 break
             cursor = page.next_cursor
@@ -282,9 +282,9 @@ class AsyncPollingConsumer:
                 to=to,
                 limit=limit,
             )
-            if not page.items:
+            if not page.data:
                 break
-            fetched.extend(page.items)
+            fetched.extend(page.data)
             if not page.next_cursor:
                 break
             cursor = page.next_cursor
@@ -359,9 +359,9 @@ class AsyncPollingConsumer:
         fetched: list[EventEnvelope] = []
         while True:
             page = await fetch_page(cursor, effective_from)
-            if not page.items:
+            if not page.data:
                 break
-            fetched.extend(page.items)
+            fetched.extend(page.data)
             if not page.next_cursor:
                 break
             cursor = page.next_cursor

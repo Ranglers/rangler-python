@@ -14,8 +14,8 @@ def main() -> None:
 
     try:
         consumer = PollingConsumer(
-            client.events,
-            cursor_store=FileCursorStore(".atlas-fund.cursor"),
+            client.v1.events,
+            cursor_store=FileCursorStore(".rangler-fund.cursor"),
             stream="fund-monitoring",
         )
 

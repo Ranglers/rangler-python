@@ -13,8 +13,8 @@ def main() -> None:
 
     try:
         consumer = PollingConsumer(
-            client.events,
-            cursor_store=FileCursorStore(".atlas-market.cursor"),
+            client.v1.events,
+            cursor_store=FileCursorStore(".rangler-market.cursor"),
             stream="market-wide-events",
         )
 

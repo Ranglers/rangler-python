@@ -8,19 +8,19 @@ from ranglerpy import (
     DuplicateEventError,
     InMemoryIdempotencyStore,
     InvalidSignatureError,
-    parse_and_verify_webhook,
+    Webhook,
 )
 
 app = FastAPI()
 store = InMemoryIdempotencyStore()
 
 
-@app.post("/atlas/webhooks")
-async def atlas_webhook(request: Request):
+@app.post("/rangler/webhooks")
+async def rangler_webhook(request: Request):
     raw_body = await request.body()
 
     try:
-        event = parse_and_verify_webhook(
+        event = Webhook.construct_event(
             headers=request.headers,
             raw_body=raw_body,
             secret=os.environ["RANGLER_WEBHOOK_SECRET"],

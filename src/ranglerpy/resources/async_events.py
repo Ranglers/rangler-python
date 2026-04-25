@@ -88,7 +88,7 @@ class AsyncEventsResource(AsyncBaseResource):
         )
         return EventsPage.from_dict(payload)
 
-    async def iter_all(
+    async def auto_paging_iter(
         self,
         *,
         event_types: Sequence[str] | None = None,
@@ -109,7 +109,7 @@ class AsyncEventsResource(AsyncBaseResource):
                 to=to,
                 limit=limit,
             )
-            for item in page.items:
+            for item in page.data:
                 yield item
             if not page.next_cursor:
                 break

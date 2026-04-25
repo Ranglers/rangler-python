@@ -10,7 +10,7 @@ class RanglerError(Exception):
 
 
 class AuthenticationError(RanglerError):
-    """Raised when the required Atlas credential is missing."""
+    """Raised when the required Rangler credential is missing."""
 
 
 class WebhookVerificationError(RanglerError):
@@ -26,7 +26,7 @@ class DuplicateEventError(RanglerError):
 
 
 class APIError(RanglerError):
-    """Raised when Atlas returns a non-success response."""
+    """Raised when Rangler returns a non-success response."""
 
     def __init__(
         self,
@@ -47,7 +47,7 @@ class APIError(RanglerError):
         except ValueError:
             payload = response.text
 
-        message = cls._extract_message(payload) or f"Atlas API returned {response.status_code}"
+        message = cls._extract_message(payload) or f"Rangler API returned {response.status_code}"
         return cls(status_code=response.status_code, message=message, payload=payload)
 
     @staticmethod

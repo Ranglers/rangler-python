@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal, Mapping
 
 import httpx
 
+from ._api_version import _ApiVersion
 from ._version import __version__
 from .exceptions import APIError, AuthenticationError
+from .idempotency import IdempotencyStore
+from .models import EventEnvelope, RanglerObject
 from .resources import (
     APIKeysResource,
     CompaniesResource,
@@ -26,6 +29,33 @@ from .resources.async_organizations import AsyncOrganizationsResource
 from .resources.async_subscriptions import AsyncSubscriptionsResource
 from .resources.async_usage import AsyncUsageResource
 from .resources.async_webhooks import AsyncWebhooksResource
+from .webhooks import Webhook
+
+
+class RanglerV1Namespace:
+    def __init__(self, client: "RanglerClient") -> None:
+        self.companies = client.companies
+        self.events = client.events
+        self.filings = client.filings
+        self.funds = client.funds
+        self.organizations = client.organizations
+        self.api_keys = client.api_keys
+        self.usage = client.usage
+        self.webhooks = client.webhooks
+        self.subscriptions = client.subscriptions
+
+
+class AsyncRanglerV1Namespace:
+    def __init__(self, client: "AsyncRanglerClient") -> None:
+        self.companies = client.companies
+        self.events = client.events
+        self.filings = client.filings
+        self.funds = client.funds
+        self.organizations = client.organizations
+        self.api_keys = client.api_keys
+        self.usage = client.usage
+        self.webhooks = client.webhooks
+        self.subscriptions = client.subscriptions
 
 
 class RanglerClient:
@@ -40,6 +70,7 @@ class RanglerClient:
         base_url: str | None = None,
         environment: str = "live",
         timeout: float = 30.0,
+        api_version: str = _ApiVersion.CURRENT,
         user_agent: str = f"ranglerpy/{__version__}",
     ) -> None:
         if environment not in {"live", "sandbox"}:
@@ -52,12 +83,14 @@ class RanglerClient:
         self.bearer_token = bearer_token
         self.base_url = resolved_base_url.rstrip("/")
         self.environment = environment
+        self.api_version = api_version
         self._http = httpx.Client(
             base_url=self.base_url,
             timeout=timeout,
             headers={
                 "User-Agent": user_agent,
                 "Accept": "application/json",
+                "Rangler-Version": api_version,
             },
         )
 
@@ -70,6 +103,7 @@ class RanglerClient:
         self.usage = UsageResource(self)
         self.webhooks = WebhooksResource(self)
         self.subscriptions = SubscriptionsResource(self)
+        self.v1 = RanglerV1Namespace(self)
 
     def close(self) -> None:
         self._http.close()
@@ -101,16 +135,35 @@ class RanglerClient:
             raise APIError.from_response(response)
         if response.status_code == 204 or not response.content:
             return None
-        return response.json()
+        return RanglerObject.from_value(response.json())
+
+    def construct_event(
+        self,
+        *,
+        raw_body: bytes,
+        headers: Mapping[str, str],
+        secret: str,
+        max_age_seconds: int | None = 300,
+        idempotency_store: IdempotencyStore | None = None,
+        idempotency_key: Literal["event_id", "webhook_id"] = "event_id",
+    ) -> EventEnvelope:
+        return Webhook.construct_event(
+            headers=headers,
+            raw_body=raw_body,
+            secret=secret,
+            max_age_seconds=max_age_seconds,
+            idempotency_store=idempotency_store,
+            idempotency_key=idempotency_key,
+        )
 
     def _build_auth_headers(self, auth: str) -> dict[str, str]:
         if auth == "api_key":
             if not self.api_key:
-                raise AuthenticationError("This operation requires an Atlas X-API-Key")
+                raise AuthenticationError("This operation requires a Rangler X-API-Key")
             return {"X-API-Key": self.api_key}
         if auth == "bearer":
             if not self.bearer_token:
-                raise AuthenticationError("This operation requires an Atlas portal bearer token")
+                raise AuthenticationError("This operation requires a Rangler portal bearer token")
             return {"Authorization": f"Bearer {self.bearer_token}"}
         raise ValueError("auth must be 'api_key' or 'bearer'")
 
@@ -127,6 +180,7 @@ class AsyncRanglerClient:
         base_url: str | None = None,
         environment: str = "live",
         timeout: float = 30.0,
+        api_version: str = _ApiVersion.CURRENT,
         user_agent: str = f"ranglerpy/{__version__}",
     ) -> None:
         if environment not in {"live", "sandbox"}:
@@ -139,12 +193,14 @@ class AsyncRanglerClient:
         self.bearer_token = bearer_token
         self.base_url = resolved_base_url.rstrip("/")
         self.environment = environment
+        self.api_version = api_version
         self._http = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=timeout,
             headers={
                 "User-Agent": user_agent,
                 "Accept": "application/json",
+                "Rangler-Version": api_version,
             },
         )
 
@@ -157,6 +213,7 @@ class AsyncRanglerClient:
         self.usage = AsyncUsageResource(self)
         self.webhooks = AsyncWebhooksResource(self)
         self.subscriptions = AsyncSubscriptionsResource(self)
+        self.v1 = AsyncRanglerV1Namespace(self)
 
     async def close(self) -> None:
         await self._http.aclose()
@@ -188,15 +245,34 @@ class AsyncRanglerClient:
             raise APIError.from_response(response)
         if response.status_code == 204 or not response.content:
             return None
-        return response.json()
+        return RanglerObject.from_value(response.json())
+
+    def construct_event(
+        self,
+        *,
+        raw_body: bytes,
+        headers: Mapping[str, str],
+        secret: str,
+        max_age_seconds: int | None = 300,
+        idempotency_store: IdempotencyStore | None = None,
+        idempotency_key: Literal["event_id", "webhook_id"] = "event_id",
+    ) -> EventEnvelope:
+        return Webhook.construct_event(
+            headers=headers,
+            raw_body=raw_body,
+            secret=secret,
+            max_age_seconds=max_age_seconds,
+            idempotency_store=idempotency_store,
+            idempotency_key=idempotency_key,
+        )
 
     def _build_auth_headers(self, auth: str) -> dict[str, str]:
         if auth == "api_key":
             if not self.api_key:
-                raise AuthenticationError("This operation requires an Atlas X-API-Key")
+                raise AuthenticationError("This operation requires a Rangler X-API-Key")
             return {"X-API-Key": self.api_key}
         if auth == "bearer":
             if not self.bearer_token:
-                raise AuthenticationError("This operation requires an Atlas portal bearer token")
+                raise AuthenticationError("This operation requires a Rangler portal bearer token")
             return {"Authorization": f"Bearer {self.bearer_token}"}
         raise ValueError("auth must be 'api_key' or 'bearer'")

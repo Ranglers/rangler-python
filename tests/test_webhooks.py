@@ -8,35 +8,63 @@ import unittest
 from ranglerpy import (
     compute_webhook_signature,
     InMemoryIdempotencyStore,
-    parse_and_verify_webhook,
-    parse_webhook_event,
     verify_webhook_signature,
+    Webhook,
 )
 from ranglerpy.exceptions import DuplicateEventError, InvalidSignatureError
 
 
+def _webhook_payload(**overrides):
+    payload = {
+        "id": "evt_123",
+        "object": "event",
+        "api_version": "v1",
+        "type": "filing.new",
+        "occurred_at": "2026-04-12T20:00:00Z",
+        "created_at": "2026-04-12T20:00:01Z",
+        "display": {
+            "title": "Test filing",
+            "summary": "Test summary",
+            "severity": "info",
+        },
+        "data": {
+            "object": {
+                "id": "filing_123",
+                "object": "filing",
+                "url": "https://example.com/filing.pdf",
+                "title": "Test filing.pdf",
+                "company_id": "company_123",
+                "published_at": "2026-04-12T19:45:00Z",
+            }
+        },
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _signed_headers(
+    raw_body: bytes,
+    *,
+    secret: str = "plain-test-secret",
+    webhook_id: str = "wh_123",
+    timestamp: str | None = None,
+) -> dict[str, str]:
+    webhook_timestamp = timestamp or str(int(time.time()))
+    return {
+        "Webhook-Id": webhook_id,
+        "Webhook-Timestamp": webhook_timestamp,
+        "Webhook-Signature": compute_webhook_signature(
+            raw_body=raw_body,
+            secret=secret,
+            webhook_id=webhook_id,
+            webhook_timestamp=webhook_timestamp,
+        ),
+    }
+
+
 class WebhookHelperTests(unittest.TestCase):
     def test_verify_webhook_signature_matches_expected_digest(self) -> None:
-        raw_body = json.dumps(
-            {
-                "id": "evt_123",
-                "type": "filing.new",
-                "occurred_at": "2026-04-12T20:00:00Z",
-                "created_at": "2026-04-12T20:00:01Z",
-                "entity_kind": "filing",
-                "entity_id": "filing_123",
-                "company_id": None,
-                "fund_id": None,
-                "source_kind": "filing",
-                "source_id": "filing_123",
-                "title": "Test filing",
-                "summary": "Test summary",
-                "severity": "info",
-                "source_url": None,
-                "source_published_at": None,
-                "data": {},
-            }
-        ).encode("utf-8")
+        raw_body = json.dumps(_webhook_payload()).encode("utf-8")
         secret = "plain-test-secret"
         webhook_id = "wh_123"
         webhook_timestamp = "1712952000"
@@ -59,7 +87,7 @@ class WebhookHelperTests(unittest.TestCase):
         )
 
     def test_verify_webhook_signature_rejects_stale_timestamp(self) -> None:
-        raw_body = b'{"id":"evt_123","type":"filing.new","occurred_at":"2026-04-12T20:00:00Z","created_at":"2026-04-12T20:00:01Z","entity_kind":"filing","entity_id":"filing_123","company_id":null,"fund_id":null,"source_kind":"filing","source_id":"filing_123","title":"Test filing","summary":"Test summary","severity":"info","source_url":null,"source_published_at":null,"data":{}}'
+        raw_body = json.dumps(_webhook_payload()).encode("utf-8")
         secret = "plain-test-secret"
         webhook_id = "wh_123"
         webhook_timestamp = str(int(time.time()) - 3600)
@@ -80,80 +108,88 @@ class WebhookHelperTests(unittest.TestCase):
             )
         )
 
-    def test_parse_webhook_event_returns_event_envelope(self) -> None:
+    def test_construct_event_returns_event_envelope(self) -> None:
         raw_body = json.dumps(
-            {
-                "id": "evt_123",
-                "type": "fund.disclosure.updated",
-                "occurred_at": "2026-04-12T20:00:00Z",
-                "created_at": "2026-04-12T20:00:01Z",
-                "entity_kind": "fund",
-                "entity_id": "fund_123",
-                "company_id": None,
-                "fund_id": "fund_123",
-                "source_kind": "fund_snapshot",
-                "source_id": "snapshot_123",
-                "title": "Fund disclosure updated",
-                "summary": "Latest factsheet posted",
-                "severity": "info",
-                "source_url": "https://example.com/factsheet.pdf",
-                "source_published_at": "2026-04-12T19:45:00Z",
-                "data": {"disclosure_kind": "asset_allocation"},
-            }
+            _webhook_payload(
+                type="fund.disclosure.updated",
+                display={
+                    "title": "Fund disclosure updated",
+                    "summary": "Latest factsheet posted",
+                    "severity": "info",
+                },
+                data={
+                    "object": {
+                        "id": "fund_123",
+                        "object": "fund",
+                        "name": "Rangler Balanced Fund",
+                    },
+                    "disclosure_kind": "asset_allocation",
+                },
+            )
         ).encode("utf-8")
 
-        event = parse_webhook_event(raw_body)
+        event = Webhook.construct_event(
+            headers=_signed_headers(raw_body),
+            raw_body=raw_body,
+            secret="plain-test-secret",
+        )
+        self.assertEqual(event.object, "event")
+        self.assertEqual(event.api_version, "v1")
         self.assertEqual(event.type, "fund.disclosure.updated")
         self.assertEqual(event.fund_id, "fund_123")
+        self.assertEqual(event.entity_kind, "fund")
+        self.assertEqual(event.entity_id, "fund_123")
+        self.assertEqual(event.title, "Fund disclosure updated")
+        self.assertEqual(event.summary, "Latest factsheet posted")
+        self.assertEqual(event.resource, {"id": "fund_123", "object": "fund", "name": "Rangler Balanced Fund"})
         self.assertEqual(event.created_at.year, 2026)
-        self.assertEqual(event.source_kind, "fund_snapshot")
-        self.assertEqual(event.source_id, "snapshot_123")
+        self.assertIsNone(event.source_kind)
+        self.assertIsNone(event.source_id)
         self.assertEqual(event.occurred_at.year, 2026)
 
-    def test_parse_and_verify_webhook_raises_for_missing_headers(self) -> None:
-        with self.assertRaises(InvalidSignatureError):
-            parse_and_verify_webhook(
-                headers={"Webhook-Id": "wh_123"},
-                raw_body=b"{}",
-                secret="plain-test-secret",
-            )
-
-    def test_parse_and_verify_webhook_detects_duplicate_event(self) -> None:
+    def test_construct_event_rejects_flat_read_api_payload(self) -> None:
         raw_body = json.dumps(
             {
-                "id": "evt_123",
+                "id": "evt_flat",
                 "type": "filing.new",
                 "occurred_at": "2026-04-12T20:00:00Z",
                 "created_at": "2026-04-12T20:00:01Z",
                 "entity_kind": "filing",
                 "entity_id": "filing_123",
-                "company_id": None,
+                "company_id": "company_123",
                 "fund_id": None,
                 "source_kind": "filing",
                 "source_id": "filing_123",
-                "title": "Test filing",
-                "summary": "Test summary",
+                "title": "Flat API filing",
+                "summary": "Flat API summary",
                 "severity": "info",
                 "source_url": None,
                 "source_published_at": None,
                 "data": {},
             }
         ).encode("utf-8")
-        webhook_timestamp = str(int(time.time()))
-        signature = compute_webhook_signature(
-            raw_body=raw_body,
-            secret="plain-test-secret",
-            webhook_id="wh_123",
-            webhook_timestamp=webhook_timestamp,
-        )
-        headers = {
-            "Webhook-Id": "wh_123",
-            "Webhook-Timestamp": webhook_timestamp,
-            "Webhook-Signature": signature,
-        }
+
+        with self.assertRaisesRegex(ValueError, "webhook payload must be an event envelope"):
+            Webhook.construct_event(
+                headers=_signed_headers(raw_body),
+                raw_body=raw_body,
+                secret="plain-test-secret",
+            )
+
+    def test_construct_event_raises_for_missing_headers(self) -> None:
+        with self.assertRaises(InvalidSignatureError):
+            Webhook.construct_event(
+                headers={"Webhook-Id": "wh_123"},
+                raw_body=b"{}",
+                secret="plain-test-secret",
+            )
+
+    def test_construct_event_detects_duplicate_event(self) -> None:
+        raw_body = json.dumps(_webhook_payload()).encode("utf-8")
+        headers = _signed_headers(raw_body)
         store = InMemoryIdempotencyStore()
 
-        event = parse_and_verify_webhook(
+        event = Webhook.construct_event(
             headers=headers,
             raw_body=raw_body,
             secret="plain-test-secret",
@@ -162,12 +198,24 @@ class WebhookHelperTests(unittest.TestCase):
         self.assertEqual(event.id, "evt_123")
 
         with self.assertRaises(DuplicateEventError):
-            parse_and_verify_webhook(
+            Webhook.construct_event(
                 headers=headers,
                 raw_body=raw_body,
                 secret="plain-test-secret",
                 idempotency_store=store,
             )
+
+    def test_webhook_construct_event_wraps_signature_verification(self) -> None:
+        raw_body = json.dumps(_webhook_payload()).encode("utf-8")
+
+        event = Webhook.construct_event(
+            headers=_signed_headers(raw_body),
+            raw_body=raw_body,
+            secret="plain-test-secret",
+        )
+
+        self.assertEqual(event.id, "evt_123")
+        self.assertEqual(event.resource.id, "filing_123")
 
 
 if __name__ == "__main__":

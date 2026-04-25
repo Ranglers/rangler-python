@@ -4,18 +4,18 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ranglerpy"
-version = "0.1.0"
-description = "Python SDK for the Atlas (Rangler) API."
+version = "0.1.1"
+description = "Python SDK for the Rangler API."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-  { name = "Atlas" }
+  { name = "Rangler" }
 ]
 dependencies = [
   "httpx>=0.27,<1.0",
 ]
-keywords = ["atlas", "rangler", "api", "events", "webhooks", "filings"]
+keywords = ["rangler", "api", "events", "webhooks", "filings"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
@@ -36,6 +36,10 @@ Issues = "https://github.com/smyja/rangler-python/issues"
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0,<9.0",
+]
+build = [
+  "build>=1.2,<2.0",
+  "twine>=5.0,<7.0",
 ]
 
 [tool.hatch.build.targets.wheel]

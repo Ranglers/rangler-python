@@ -43,20 +43,25 @@ client_module = importlib.import_module("ranglerpy.client")
 RanglerClient = client_module.RanglerClient
 AsyncRanglerClient = client_module.AsyncRanglerClient
 AuthenticationError = importlib.import_module("ranglerpy.exceptions").AuthenticationError
+__version__ = importlib.import_module("ranglerpy._version").__version__
 
 
 class RanglerClientTests(unittest.TestCase):
     def test_client_uses_sandbox_base_url(self) -> None:
-        client = RanglerClient(api_key="atl_test_123", environment="sandbox")
+        client = RanglerClient(api_key="rgl_test_123", environment="sandbox")
         try:
             self.assertEqual(client.base_url, "https://sandbox-api.rangler.co/v1")
-            self.assertEqual(client._http.headers["User-Agent"], "ranglerpy/0.1.0")
+            self.assertEqual(client.api_version, "v1")
+            self.assertEqual(client._http.headers["User-Agent"], f"ranglerpy/{__version__}")
+            self.assertEqual(client._http.headers["Rangler-Version"], "v1")
             self.assertTrue(hasattr(client, "funds"))
+            self.assertIs(client.v1.events, client.events)
+            self.assertIs(client.v1.companies, client.companies)
         finally:
             client.close()
 
     def test_bearer_auth_requirement_is_enforced(self) -> None:
-        client = RanglerClient(api_key="atl_test_123")
+        client = RanglerClient(api_key="rgl_test_123")
         try:
             with self.assertRaises(AuthenticationError):
                 client._build_auth_headers("bearer")
@@ -64,10 +69,21 @@ class RanglerClientTests(unittest.TestCase):
             client.close()
 
     def test_async_client_uses_sandbox_base_url(self) -> None:
-        client = AsyncRanglerClient(api_key="atl_test_123", environment="sandbox")
+        client = AsyncRanglerClient(api_key="rgl_test_123", environment="sandbox")
         self.assertEqual(client.base_url, "https://sandbox-api.rangler.co/v1")
-        self.assertEqual(client._http.headers["User-Agent"], "ranglerpy/0.1.0")
+        self.assertEqual(client.api_version, "v1")
+        self.assertEqual(client._http.headers["User-Agent"], f"ranglerpy/{__version__}")
+        self.assertEqual(client._http.headers["Rangler-Version"], "v1")
         self.assertTrue(hasattr(client, "funds"))
+        self.assertIs(client.v1.events, client.events)
+
+    def test_client_allows_custom_api_version_header(self) -> None:
+        client = RanglerClient(api_key="rgl_test_123", api_version="v1.preview")
+        try:
+            self.assertEqual(client.api_version, "v1.preview")
+            self.assertEqual(client._http.headers["Rangler-Version"], "v1.preview")
+        finally:
+            client.close()
 
 
 if __name__ == "__main__":

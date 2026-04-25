@@ -1,3 +1,4 @@
+from ._api_version import _ApiVersion
 from ._version import __version__
 from .exceptions import (
     APIError,
@@ -8,7 +9,7 @@ from .exceptions import (
     WebhookVerificationError,
 )
 from .idempotency import IdempotencyStore, InMemoryIdempotencyStore
-from .models import EventEnvelope, EventsPage
+from .models import EventEnvelope, EventsPage, RanglerObject
 from .polling import (
     AsyncPollingConsumer,
     CursorStore,
@@ -18,12 +19,13 @@ from .polling import (
     PollingConsumer,
 )
 from .webhooks import (
+    Webhook,
     compute_webhook_signature,
     extract_webhook_headers,
-    parse_and_verify_webhook,
-    parse_webhook_event,
     verify_webhook_signature,
 )
+
+__api_version__ = _ApiVersion.CURRENT
 
 __all__ = [
     "APIError",
@@ -43,12 +45,14 @@ __all__ = [
     "PollingConsumer",
     "RanglerClient",
     "RanglerError",
+    "RanglerObject",
     "WebhookVerificationError",
+    "Webhook",
     "compute_webhook_signature",
     "extract_webhook_headers",
-    "parse_and_verify_webhook",
-    "parse_webhook_event",
     "verify_webhook_signature",
+    "__api_version__",
+    "__version__",
 ]
 
 

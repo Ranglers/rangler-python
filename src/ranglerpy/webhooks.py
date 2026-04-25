@@ -75,12 +75,17 @@ def extract_webhook_headers(headers: Mapping[str, str]) -> tuple[str, str, str]:
         raise InvalidSignatureError(f"Missing required webhook header: {exc.args[0]}") from exc
 
 
-def parse_webhook_event(raw_body: bytes) -> EventEnvelope:
+def _parse_webhook_event(raw_body: bytes) -> EventEnvelope:
     payload = json.loads(raw_body.decode("utf-8"))
+    if payload.get("object") != "event" or not isinstance(payload.get("display"), dict):
+        raise ValueError("Rangler webhook payload must be an event envelope")
+    data = payload.get("data")
+    if not isinstance(data, dict) or not isinstance(data.get("object"), dict):
+        raise ValueError("Rangler webhook payload must include data.object")
     return EventEnvelope.from_dict(payload)
 
 
-def parse_and_verify_webhook(
+def _parse_and_verify_webhook(
     *,
     headers: Mapping[str, str],
     raw_body: bytes,
@@ -99,10 +104,31 @@ def parse_and_verify_webhook(
         max_age_seconds=max_age_seconds,
     )
     if not is_valid:
-        raise InvalidSignatureError("Atlas webhook signature verification failed")
-    event = parse_webhook_event(raw_body)
+        raise InvalidSignatureError("Rangler webhook signature verification failed")
+    event = _parse_webhook_event(raw_body)
     if idempotency_store is not None:
         key = event.id if idempotency_key == "event_id" else webhook_id
         if not idempotency_store.claim(key):
-            raise DuplicateEventError(f"Atlas webhook already processed for key: {key}")
+            raise DuplicateEventError(f"Rangler webhook already processed for key: {key}")
     return event
+
+
+class Webhook:
+    @staticmethod
+    def construct_event(
+        *,
+        raw_body: bytes,
+        headers: Mapping[str, str],
+        secret: str,
+        max_age_seconds: int | None = 300,
+        idempotency_store: IdempotencyStore | None = None,
+        idempotency_key: Literal["event_id", "webhook_id"] = "event_id",
+    ) -> EventEnvelope:
+        return _parse_and_verify_webhook(
+            headers=headers,
+            raw_body=raw_body,
+            secret=secret,
+            max_age_seconds=max_age_seconds,
+            idempotency_store=idempotency_store,
+            idempotency_key=idempotency_key,
+        )

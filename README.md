@@ -1,19 +1,19 @@
 # ranglerpy
 
-`ranglerpy` is a Python SDK for the Atlas API.
+`ranglerpy` is a Python SDK for the Rangler API.
 
-It is designed around the actual Atlas product shape:
+It is designed around the actual Rangler product shape:
 
 - polling-first event consumption
 - optional webhook verification helpers
 - thin wrappers for the developer control plane
 
-The goal is to make Atlas easy to integrate whether you want to:
+The goal is to make Rangler easy to integrate whether you want to:
 
 - poll event feeds with a cursor
 - consume companies and filings directly
 - manage webhook endpoints and event subscriptions
-- verify Atlas webhook signatures in a receiver
+- verify Rangler webhook signatures in a receiver
 
 It is designed to give you one integration surface across:
 
@@ -22,6 +22,14 @@ It is designed to give you one integration surface across:
 - developer control-plane operations
 
 ## Installation
+
+With uv:
+
+```bash
+uv add ranglerpy
+```
+
+With pip:
 
 ```bash
 pip install ranglerpy
@@ -33,6 +41,23 @@ For local development:
 pip install -e .[dev]
 ```
 
+For release builds:
+
+```bash
+python scripts/update_version.py 0.1.1
+python -m unittest discover -s tests -v
+uv build --no-sources
+UV_PUBLISH_TOKEN=pypi-your-project-token uv publish
+```
+
+For local checks with the PyPA tools:
+
+```bash
+pip install -e .[build]
+python -m build
+python -m twine check dist/*
+```
+
 ## Quick start
 
 ### Data plane: polling events
@@ -41,12 +66,12 @@ pip install -e .[dev]
 from ranglerpy import InMemoryCursorStore, PollingConsumer, RanglerClient
 
 client = RanglerClient(
-    api_key="atl_test_your_api_key",
+    api_key="rgl_test_your_api_key",
     environment="sandbox",
 )
 
 consumer = PollingConsumer(
-    client.events,
+    client.v1.events,
     cursor_store=InMemoryCursorStore(),
     stream="market-wide-filings",
 )
@@ -61,12 +86,12 @@ for event in consumer.poll(event_types=["filing.new"], limit=100):
 from ranglerpy import AsyncPollingConsumer, AsyncRanglerClient, FileCursorStore
 
 async with AsyncRanglerClient(
-    api_key="atl_test_your_api_key",
+    api_key="rgl_test_your_api_key",
     environment="sandbox",
 ) as client:
     consumer = AsyncPollingConsumer(
-        client.events,
-        cursor_store=FileCursorStore(".atlas-cursors.json"),
+        client.v1.events,
+        cursor_store=FileCursorStore(".rangler-cursors.json"),
         stream="issuer-monitoring",
     )
 
@@ -88,13 +113,13 @@ client = RanglerClient(
 )
 
 organization = client.organizations.create(
-    name="Atlas Demo Org",
+    name="Rangler Demo Org",
     billing_email="billing@example.com",
 )
 
 webhook = client.webhooks.create(
     organization["id"],
-    url="https://example.com/atlas/webhooks",
+    url="https://example.com/rangler/webhooks",
 )
 
 print(webhook["signing_secret"])
@@ -103,18 +128,18 @@ print(webhook["signing_secret"])
 ### Webhook verification
 
 ```python
-from ranglerpy import InMemoryIdempotencyStore, parse_and_verify_webhook
+from ranglerpy import InMemoryIdempotencyStore, Webhook
 
 idempotency_store = InMemoryIdempotencyStore()
 
-event = parse_and_verify_webhook(
+event = Webhook.construct_event(
     headers=headers,
     raw_body=raw_body,
     secret=webhook_secret,
     idempotency_store=idempotency_store,
 )
 
-print(event.type, event.title)
+print(event.type, event.display.title, event.data.object.id)
 ```
 
 ### FastAPI webhook handler
@@ -122,18 +147,18 @@ print(event.type, event.title)
 ```python
 from fastapi import FastAPI, HTTPException, Request
 
-from ranglerpy import DuplicateEventError, InMemoryIdempotencyStore, InvalidSignatureError, parse_and_verify_webhook
+from ranglerpy import DuplicateEventError, InMemoryIdempotencyStore, InvalidSignatureError, Webhook
 
 app = FastAPI()
 store = InMemoryIdempotencyStore()
 
 
-@app.post("/atlas/webhooks")
-async def atlas_webhook(request: Request):
+@app.post("/rangler/webhooks")
+async def rangler_webhook(request: Request):
     raw_body = await request.body()
 
     try:
-        event = parse_and_verify_webhook(
+        event = Webhook.construct_event(
             headers=request.headers,
             raw_body=raw_body,
             secret="whsec_your_secret",
@@ -152,18 +177,18 @@ async def atlas_webhook(request: Request):
 ```python
 from flask import Flask, jsonify, request
 
-from ranglerpy import DuplicateEventError, InMemoryIdempotencyStore, InvalidSignatureError, parse_and_verify_webhook
+from ranglerpy import DuplicateEventError, InMemoryIdempotencyStore, InvalidSignatureError, Webhook
 
 app = Flask(__name__)
 store = InMemoryIdempotencyStore()
 
 
-@app.post("/atlas/webhooks")
-def atlas_webhook():
+@app.post("/rangler/webhooks")
+def rangler_webhook():
     raw_body = request.get_data()
 
     try:
-        event = parse_and_verify_webhook(
+        event = Webhook.construct_event(
             headers=request.headers,
             raw_body=raw_body,
             secret="whsec_your_secret",
@@ -179,7 +204,7 @@ def atlas_webhook():
 
 ## Authentication modes
 
-Atlas has two auth modes:
+Rangler has two auth modes:
 
 - data plane uses `X-API-Key`
 - developer control plane uses `Authorization: Bearer ...`
@@ -207,10 +232,12 @@ Atlas has two auth modes:
 ### Helpers
 
 - cursor-based event iteration
+- Stripe-style `client.v1.*` namespace
+- list responses with `data`
+- dynamic object access for webhook/API payloads, e.g. `event.data.object.id`
 - polling consumer with checkpoint persistence
-- Atlas webhook signature verification
-- webhook payload parsing
-- parse-and-verify helper for webhook receivers
+- Rangler webhook signature verification
+- `Webhook.construct_event(...)` for webhook receivers
 - in-memory idempotency helper for duplicate webhook handling
 - async client support
 
@@ -227,6 +254,8 @@ These are intentionally small. They are meant to be copied into a real worker, c
 
 ## Notes
 
-This first version is intentionally thin. It aims to give Atlas customers one integration surface across polling and webhooks instead of pushing everyone straight into raw HTTP and receiver boilerplate.
+This first version is intentionally thin. It aims to give Rangler customers one integration surface across polling and webhooks instead of pushing everyone straight into raw HTTP and receiver boilerplate.
 
-You can override `base_url` explicitly if you need to point the SDK at a different Atlas environment.
+You can override `base_url` explicitly if you need to point the SDK at a different Rangler environment.
+
+The package version is tracked in `VERSION`, `pyproject.toml`, and `src/ranglerpy/_version.py`. The API contract version is tracked separately in `src/ranglerpy/_api_version.py`.
