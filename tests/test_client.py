@@ -55,8 +55,13 @@ class RanglerClientTests(unittest.TestCase):
             self.assertEqual(client._http.headers["User-Agent"], f"ranglerpy/{__version__}")
             self.assertEqual(client._http.headers["Rangler-Version"], "v1")
             self.assertTrue(hasattr(client, "funds"))
+            self.assertTrue(hasattr(client, "connect"))
+            self.assertTrue(hasattr(client, "event_destinations"))
             self.assertIs(client.v1.events, client.events)
             self.assertIs(client.v1.companies, client.companies)
+            self.assertIs(client.v1.connect, client.connect)
+            self.assertIs(client.v1.event_destinations, client.event_destinations)
+            self.assertFalse(hasattr(client, "webhooks"))
         finally:
             client.close()
 
@@ -75,7 +80,12 @@ class RanglerClientTests(unittest.TestCase):
         self.assertEqual(client._http.headers["User-Agent"], f"ranglerpy/{__version__}")
         self.assertEqual(client._http.headers["Rangler-Version"], "v1")
         self.assertTrue(hasattr(client, "funds"))
+        self.assertTrue(hasattr(client, "connect"))
+        self.assertTrue(hasattr(client, "event_destinations"))
         self.assertIs(client.v1.events, client.events)
+        self.assertIs(client.v1.connect, client.connect)
+        self.assertIs(client.v1.event_destinations, client.event_destinations)
+        self.assertFalse(hasattr(client, "webhooks"))
 
     def test_client_allows_custom_api_version_header(self) -> None:
         client = RanglerClient(api_key="rgl_test_123", api_version="v1.preview")

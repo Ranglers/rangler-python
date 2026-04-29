@@ -12,49 +12,53 @@ from .models import EventEnvelope, RanglerObject
 from .resources import (
     APIKeysResource,
     CompaniesResource,
+    ConnectResource,
+    EventDestinationsResource,
     EventsResource,
     FilingsResource,
     FundsResource,
     OrganizationsResource,
     SubscriptionsResource,
     UsageResource,
-    WebhooksResource,
 )
 from .resources.async_api_keys import AsyncAPIKeysResource
 from .resources.async_companies import AsyncCompaniesResource
+from .resources.async_connect import AsyncConnectResource
+from .resources.async_webhooks import AsyncEventDestinationsResource
 from .resources.async_events import AsyncEventsResource
 from .resources.async_filings import AsyncFilingsResource
 from .resources.async_funds import AsyncFundsResource
 from .resources.async_organizations import AsyncOrganizationsResource
 from .resources.async_subscriptions import AsyncSubscriptionsResource
 from .resources.async_usage import AsyncUsageResource
-from .resources.async_webhooks import AsyncWebhooksResource
 from .webhooks import Webhook
 
 
 class RanglerV1Namespace:
     def __init__(self, client: "RanglerClient") -> None:
         self.companies = client.companies
+        self.connect = client.connect
+        self.event_destinations = client.event_destinations
         self.events = client.events
         self.filings = client.filings
         self.funds = client.funds
         self.organizations = client.organizations
         self.api_keys = client.api_keys
         self.usage = client.usage
-        self.webhooks = client.webhooks
         self.subscriptions = client.subscriptions
 
 
 class AsyncRanglerV1Namespace:
     def __init__(self, client: "AsyncRanglerClient") -> None:
         self.companies = client.companies
+        self.connect = client.connect
+        self.event_destinations = client.event_destinations
         self.events = client.events
         self.filings = client.filings
         self.funds = client.funds
         self.organizations = client.organizations
         self.api_keys = client.api_keys
         self.usage = client.usage
-        self.webhooks = client.webhooks
         self.subscriptions = client.subscriptions
 
 
@@ -95,13 +99,14 @@ class RanglerClient:
         )
 
         self.companies = CompaniesResource(self)
+        self.connect = ConnectResource(self)
+        self.event_destinations = EventDestinationsResource(self)
         self.events = EventsResource(self)
         self.filings = FilingsResource(self)
         self.funds = FundsResource(self)
         self.organizations = OrganizationsResource(self)
         self.api_keys = APIKeysResource(self)
         self.usage = UsageResource(self)
-        self.webhooks = WebhooksResource(self)
         self.subscriptions = SubscriptionsResource(self)
         self.v1 = RanglerV1Namespace(self)
 
@@ -205,13 +210,14 @@ class AsyncRanglerClient:
         )
 
         self.companies = AsyncCompaniesResource(self)
+        self.connect = AsyncConnectResource(self)
+        self.event_destinations = AsyncEventDestinationsResource(self)
         self.events = AsyncEventsResource(self)
         self.filings = AsyncFilingsResource(self)
         self.funds = AsyncFundsResource(self)
         self.organizations = AsyncOrganizationsResource(self)
         self.api_keys = AsyncAPIKeysResource(self)
         self.usage = AsyncUsageResource(self)
-        self.webhooks = AsyncWebhooksResource(self)
         self.subscriptions = AsyncSubscriptionsResource(self)
         self.v1 = AsyncRanglerV1Namespace(self)
 

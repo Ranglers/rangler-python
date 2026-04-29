@@ -11,6 +11,15 @@ from .exceptions import DuplicateEventError, InvalidSignatureError
 from .idempotency import IdempotencyStore
 from .models import EventEnvelope
 
+WEBHOOK_ID_HEADERS = ("webhook-id", "x-rangler-id", "x-rangler-event-id", "x-rangler-idempotency")
+WEBHOOK_TIMESTAMP_HEADERS = ("webhook-timestamp", "x-rangler-timestamp", "x-webhook-timestamp")
+WEBHOOK_SIGNATURE_HEADERS = (
+    "webhook-signature",
+    "x-rangler-signature",
+    "x-rangler-webhook-signature",
+    "x-webhook-signature",
+)
+
 
 def decode_webhook_secret(secret: str) -> bytes:
     if not secret.startswith("whsec_"):
@@ -38,6 +47,35 @@ def compute_webhook_signature(
     return f"v1,{base64.b64encode(digest).decode('utf-8')}"
 
 
+def _header(headers: Mapping[str, str], *names: str) -> str | None:
+    normalized = {key.lower(): value for key, value in headers.items()}
+    for name in names:
+        value = normalized.get(name)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _signature_values(value: str) -> list[str]:
+    values: list[str] = []
+    for part in value.replace(";", " ").split():
+        candidate = part.strip()
+        if not candidate:
+            continue
+        if "," in candidate:
+            version, signature = candidate.split(",", 1)
+            if version.strip() == "v1" and signature.strip():
+                values.append(signature.strip())
+            continue
+        if "=" in candidate:
+            algorithm, signature = candidate.split("=", 1)
+            if algorithm.strip().lower() in {"sha256", "v1"} and signature.strip():
+                values.append(signature.strip())
+                continue
+        values.append(candidate)
+    return values
+
+
 def verify_webhook_signature(
     *,
     raw_body: bytes,
@@ -60,19 +98,24 @@ def verify_webhook_signature(
         webhook_id=webhook_id,
         webhook_timestamp=webhook_timestamp,
     )
-    return hmac.compare_digest(expected, signature)
+    expected_value = expected.split(",", 1)[1]
+    for candidate in _signature_values(signature):
+        if hmac.compare_digest(expected, candidate) or hmac.compare_digest(expected_value, candidate):
+            return True
+    return False
 
 
 def extract_webhook_headers(headers: Mapping[str, str]) -> tuple[str, str, str]:
-    normalized = {key.lower(): value for key, value in headers.items()}
-    try:
-        return (
-            normalized["webhook-id"],
-            normalized["webhook-timestamp"],
-            normalized["webhook-signature"],
-        )
-    except KeyError as exc:
-        raise InvalidSignatureError(f"Missing required webhook header: {exc.args[0]}") from exc
+    webhook_id = _header(headers, *WEBHOOK_ID_HEADERS)
+    webhook_timestamp = _header(headers, *WEBHOOK_TIMESTAMP_HEADERS)
+    signature = _header(headers, *WEBHOOK_SIGNATURE_HEADERS)
+    if webhook_id is None:
+        raise InvalidSignatureError("Missing required webhook header: webhook-id")
+    if webhook_timestamp is None:
+        raise InvalidSignatureError("Missing required webhook header: webhook-timestamp")
+    if signature is None:
+        raise InvalidSignatureError("Missing required webhook header: webhook-signature")
+    return webhook_id, webhook_timestamp, signature
 
 
 def _parse_webhook_event(raw_body: bytes) -> EventEnvelope:

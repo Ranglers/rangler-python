@@ -12,7 +12,7 @@ The goal is to make Rangler easy to integrate whether you want to:
 
 - poll event feeds with a cursor
 - consume companies and filings directly
-- manage webhook endpoints and event subscriptions
+- manage event destinations and market/Connect event subscriptions
 - verify Rangler webhook signatures in a receiver
 
 It is designed to give you one integration surface across:
@@ -102,7 +102,7 @@ async with AsyncRanglerClient(
         print(event.id, event.type)
 ```
 
-### Control plane: manage webhooks
+### Control plane: manage event destinations
 
 ```python
 from ranglerpy import RanglerClient
@@ -117,12 +117,24 @@ organization = client.organizations.create(
     billing_email="billing@example.com",
 )
 
-webhook = client.webhooks.create(
+destination = client.event_destinations.create(
     organization["id"],
     url="https://example.com/rangler/webhooks",
 )
 
-print(webhook["signing_secret"])
+print(destination["id"])
+```
+
+```python
+subscription = client.subscriptions.create_connect(
+    organization["id"],
+    destination_id=destination["id"],
+    name="All Connect events",
+    event_types=["connect.sync.completed", "connect.item.login_required"],
+    environment="live",
+)
+
+print(subscription["id"])
 ```
 
 ### Webhook verification
@@ -225,9 +237,10 @@ Rangler has two auth modes:
 - organizations
 - API keys
 - usage and billing status
-- webhook endpoints
+- event destinations
 - webhook deliveries
-- event subscriptions
+- market event subscriptions
+- Connect event subscriptions
 
 ### Helpers
 
