@@ -90,31 +90,27 @@ class WebhookHelperTests(unittest.TestCase):
             )
         )
 
-    def test_verify_webhook_signature_accepts_raw_and_sha256_signature_values(self) -> None:
+    def test_verify_webhook_signature_accepts_standard_whsec_secret(self) -> None:
         raw_body = json.dumps(_webhook_payload()).encode("utf-8")
-        secret = "plain-test-secret"
+        secret_bytes = b"plain-test-secret"
+        secret = "whsec_" + base64.b64encode(secret_bytes).decode("utf-8")
         webhook_id = "wh_123"
         webhook_timestamp = "1712952000"
-        raw_signature = _raw_signature(
-            compute_webhook_signature(
+        signed_payload = b".".join(
+            [webhook_id.encode("utf-8"), webhook_timestamp.encode("utf-8"), raw_body]
+        )
+        signature = "v1," + base64.b64encode(hmac.new(secret_bytes, signed_payload, sha256).digest()).decode("utf-8")
+
+        self.assertTrue(
+            verify_webhook_signature(
                 raw_body=raw_body,
                 secret=secret,
                 webhook_id=webhook_id,
                 webhook_timestamp=webhook_timestamp,
+                signature=signature,
+                max_age_seconds=None,
             )
         )
-
-        for signature in (raw_signature, f"sha256={raw_signature}", f"v1={raw_signature}"):
-            self.assertTrue(
-                verify_webhook_signature(
-                    raw_body=raw_body,
-                    secret=secret,
-                    webhook_id=webhook_id,
-                    webhook_timestamp=webhook_timestamp,
-                    signature=signature,
-                    max_age_seconds=None,
-                )
-            )
 
     def test_verify_webhook_signature_rejects_stale_timestamp(self) -> None:
         raw_body = json.dumps(_webhook_payload()).encode("utf-8")
@@ -247,21 +243,20 @@ class WebhookHelperTests(unittest.TestCase):
         self.assertEqual(event.id, "evt_123")
         self.assertEqual(event.resource.id, "filing_123")
 
-    def test_construct_event_accepts_rangler_header_aliases(self) -> None:
+    def test_construct_event_rejects_rangler_header_aliases(self) -> None:
         raw_body = json.dumps(_webhook_payload()).encode("utf-8")
         headers = _signed_headers(raw_body, webhook_id="evt_delivery_123")
-        event = Webhook.construct_event(
-            headers={
-                "X-Rangler-Id": "evt_delivery_123",
-                "X-Rangler-Timestamp": headers["Webhook-Timestamp"],
-                "X-Rangler-Signature": _raw_signature(headers["Webhook-Signature"]),
-            },
-            raw_body=raw_body,
-            secret="plain-test-secret",
-        )
 
-        self.assertEqual(event.id, "evt_123")
-        self.assertEqual(event.type, "filing.new")
+        with self.assertRaisesRegex(InvalidSignatureError, "Missing required webhook header"):
+            Webhook.construct_event(
+                headers={
+                    "X-Rangler-Id": "evt_delivery_123",
+                    "X-Rangler-Timestamp": headers["Webhook-Timestamp"],
+                    "X-Rangler-Signature": _raw_signature(headers["Webhook-Signature"]),
+                },
+                raw_body=raw_body,
+                secret="plain-test-secret",
+            )
 
     def test_construct_event_accepts_connect_event_envelope(self) -> None:
         raw_body = json.dumps(
