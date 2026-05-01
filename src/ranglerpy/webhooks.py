@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hmac
 import json
 from hashlib import sha256
@@ -11,22 +12,19 @@ from .exceptions import DuplicateEventError, InvalidSignatureError
 from .idempotency import IdempotencyStore
 from .models import EventEnvelope
 
-WEBHOOK_ID_HEADERS = ("webhook-id", "x-rangler-id", "x-rangler-event-id", "x-rangler-idempotency")
-WEBHOOK_TIMESTAMP_HEADERS = ("webhook-timestamp", "x-rangler-timestamp", "x-webhook-timestamp")
-WEBHOOK_SIGNATURE_HEADERS = (
-    "webhook-signature",
-    "x-rangler-signature",
-    "x-rangler-webhook-signature",
-    "x-webhook-signature",
-)
+WEBHOOK_ID_HEADER = "webhook-id"
+WEBHOOK_TIMESTAMP_HEADER = "webhook-timestamp"
+WEBHOOK_SIGNATURE_HEADER = "webhook-signature"
 
 
 def decode_webhook_secret(secret: str) -> bytes:
     if not secret.startswith("whsec_"):
         return secret.encode("utf-8")
     encoded = secret[len("whsec_") :]
-    padded = encoded + ("=" * ((4 - len(encoded) % 4) % 4))
-    return base64.urlsafe_b64decode(padded.encode("utf-8"))
+    try:
+        return base64.b64decode(encoded.encode("utf-8"), validate=True)
+    except binascii.Error as exc:
+        raise InvalidSignatureError("Invalid webhook secret") from exc
 
 
 def compute_webhook_signature(
@@ -66,13 +64,6 @@ def _signature_values(value: str) -> list[str]:
             version, signature = candidate.split(",", 1)
             if version.strip() == "v1" and signature.strip():
                 values.append(signature.strip())
-            continue
-        if "=" in candidate:
-            algorithm, signature = candidate.split("=", 1)
-            if algorithm.strip().lower() in {"sha256", "v1"} and signature.strip():
-                values.append(signature.strip())
-                continue
-        values.append(candidate)
     return values
 
 
@@ -106,9 +97,9 @@ def verify_webhook_signature(
 
 
 def extract_webhook_headers(headers: Mapping[str, str]) -> tuple[str, str, str]:
-    webhook_id = _header(headers, *WEBHOOK_ID_HEADERS)
-    webhook_timestamp = _header(headers, *WEBHOOK_TIMESTAMP_HEADERS)
-    signature = _header(headers, *WEBHOOK_SIGNATURE_HEADERS)
+    webhook_id = _header(headers, WEBHOOK_ID_HEADER)
+    webhook_timestamp = _header(headers, WEBHOOK_TIMESTAMP_HEADER)
+    signature = _header(headers, WEBHOOK_SIGNATURE_HEADER)
     if webhook_id is None:
         raise InvalidSignatureError("Missing required webhook header: webhook-id")
     if webhook_timestamp is None:
