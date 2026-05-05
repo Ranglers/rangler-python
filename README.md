@@ -44,7 +44,7 @@ pip install -e .[dev]
 For release builds:
 
 ```bash
-python scripts/update_version.py 0.1.1
+python scripts/update_version.py 0.1.4
 python -m unittest discover -s tests -v
 uv build --no-sources
 UV_PUBLISH_TOKEN=pypi-your-project-token uv publish
@@ -124,6 +124,31 @@ destination = client.event_destinations.create(
 
 print(destination["id"])
 ```
+
+### Data plane: Connect
+
+```python
+from ranglerpy import RanglerClient
+
+client = RanglerClient(
+    api_key="rgl_test_your_api_key",
+    environment="sandbox",
+)
+
+link_token = client.connect.create_link_token(
+    client_user_id="customer_123",
+    allowed_origins=["https://app.example.com"],
+    products=["accounts", "positions", "transactions"],
+    idempotency_key="customer_123-connect-link",
+)
+
+connections = client.connect.list_connections(client_user_id="customer_123")
+portfolio = client.connect.get_portfolio(client_user_id="customer_123")
+
+print(link_token["link_token"], len(connections["data"]), portfolio["totals"])
+```
+
+### Control plane: Connect subscriptions
 
 ```python
 subscription = client.subscriptions.create_connect(
@@ -228,6 +253,7 @@ Rangler has two auth modes:
 ### Data plane
 
 - companies
+- Connect accounts, positions, transactions, portfolio, and link tokens
 - filings
 - funds
 - event feeds
@@ -236,6 +262,7 @@ Rangler has two auth modes:
 
 - organizations
 - API keys
+- Connect institutions and connections for an organization
 - usage and billing status
 - event destinations
 - webhook deliveries

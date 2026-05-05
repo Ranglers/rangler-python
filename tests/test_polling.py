@@ -122,6 +122,15 @@ class _FakeEventsClient:
 
 
 class PollingConsumerTests(unittest.TestCase):
+    def test_events_resource_filters_by_event_types(self) -> None:
+        client = _FakeEventsClient()
+        resource = EventsResource(client)
+
+        page = resource.list(event_types=["filing.new"], limit=2)
+
+        self.assertEqual(len(page.data), 2)
+        self.assertEqual(client.calls[0][3]["type"], ["filing.new"])
+
     def test_events_resource_auto_paging_iter_returns_all_pages(self) -> None:
         client = _FakeEventsClient()
         resource = EventsResource(client)

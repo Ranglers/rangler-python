@@ -34,6 +34,24 @@ from .resources.async_usage import AsyncUsageResource
 from .webhooks import Webhook
 
 
+def _derive_developer_base_url(data_base_url: str) -> str:
+    base_url = data_base_url.rstrip("/")
+    if base_url.endswith("/v1"):
+        return f"{base_url[:-3]}/developer/v1"
+    return f"{base_url}/developer/v1"
+
+
+def _is_absolute_url(url: str) -> bool:
+    return url.startswith(("http://", "https://"))
+
+
+def _request_url(path: str, *, auth: str, developer_base_url: str) -> str:
+    if _is_absolute_url(path) or auth != "bearer":
+        return path
+    normalized_path = path if path.startswith("/") else f"/{path}"
+    return f"{developer_base_url}{normalized_path}"
+
+
 class RanglerV1Namespace:
     def __init__(self, client: "RanglerClient") -> None:
         self.companies = client.companies
@@ -64,6 +82,7 @@ class AsyncRanglerV1Namespace:
 
 class RanglerClient:
     LIVE_BASE_URL = "https://api.rangler.co/v1"
+    LIVE_DEVELOPER_BASE_URL = "https://api.rangler.co/developer/v1"
     SANDBOX_BASE_URL = "https://sandbox-api.rangler.co/v1"
 
     def __init__(
@@ -72,6 +91,7 @@ class RanglerClient:
         api_key: str | None = None,
         bearer_token: str | None = None,
         base_url: str | None = None,
+        developer_base_url: str | None = None,
         environment: str = "live",
         timeout: float = 30.0,
         api_version: str = _ApiVersion.CURRENT,
@@ -86,6 +106,9 @@ class RanglerClient:
         self.api_key = api_key
         self.bearer_token = bearer_token
         self.base_url = resolved_base_url.rstrip("/")
+        self.developer_base_url = (
+            developer_base_url or _derive_developer_base_url(resolved_base_url)
+        ).rstrip("/")
         self.environment = environment
         self.api_version = api_version
         self._http = httpx.Client(
@@ -127,12 +150,15 @@ class RanglerClient:
         auth: str,
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> Any:
-        headers = self._build_auth_headers(auth)
+        request_headers = self._build_auth_headers(auth)
+        if headers:
+            request_headers.update(headers)
         response = self._http.request(
             method=method,
-            url=path,
-            headers=headers,
+            url=_request_url(path, auth=auth, developer_base_url=self.developer_base_url),
+            headers=request_headers,
             params=params,
             json=json,
         )
@@ -176,6 +202,7 @@ class RanglerClient:
 class AsyncRanglerClient:
     LIVE_BASE_URL = RanglerClient.LIVE_BASE_URL
     SANDBOX_BASE_URL = RanglerClient.SANDBOX_BASE_URL
+    LIVE_DEVELOPER_BASE_URL = RanglerClient.LIVE_DEVELOPER_BASE_URL
 
     def __init__(
         self,
@@ -183,6 +210,7 @@ class AsyncRanglerClient:
         api_key: str | None = None,
         bearer_token: str | None = None,
         base_url: str | None = None,
+        developer_base_url: str | None = None,
         environment: str = "live",
         timeout: float = 30.0,
         api_version: str = _ApiVersion.CURRENT,
@@ -197,6 +225,9 @@ class AsyncRanglerClient:
         self.api_key = api_key
         self.bearer_token = bearer_token
         self.base_url = resolved_base_url.rstrip("/")
+        self.developer_base_url = (
+            developer_base_url or _derive_developer_base_url(resolved_base_url)
+        ).rstrip("/")
         self.environment = environment
         self.api_version = api_version
         self._http = httpx.AsyncClient(
@@ -238,12 +269,15 @@ class AsyncRanglerClient:
         auth: str,
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> Any:
-        headers = self._build_auth_headers(auth)
+        request_headers = self._build_auth_headers(auth)
+        if headers:
+            request_headers.update(headers)
         response = await self._http.request(
             method=method,
-            url=path,
-            headers=headers,
+            url=_request_url(path, auth=auth, developer_base_url=self.developer_base_url),
+            headers=request_headers,
             params=params,
             json=json,
         )

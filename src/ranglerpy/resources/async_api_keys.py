@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from .async_base import AsyncBaseResource
 
 
@@ -14,6 +16,7 @@ class AsyncAPIKeysResource(AsyncBaseResource):
         name: str,
         environment: str = "live",
         expires_at: str | None = None,
+        scopes: Sequence[str] | None = None,
     ) -> dict:
         payload = {
             "name": name,
@@ -21,6 +24,8 @@ class AsyncAPIKeysResource(AsyncBaseResource):
         }
         if expires_at is not None:
             payload["expires_at"] = expires_at
+        if scopes is not None:
+            payload["scopes"] = list(scopes)
         return await self._post(
             f"/organizations/{organization_id}/api-keys",
             json=payload,
