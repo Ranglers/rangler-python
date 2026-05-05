@@ -6,20 +6,19 @@ It is designed around the actual Rangler product shape:
 
 - polling-first event consumption
 - optional webhook verification helpers
-- thin wrappers for the developer control plane
 
 The goal is to make Rangler easy to integrate whether you want to:
 
 - poll event feeds with a cursor
 - consume companies and filings directly
-- manage event destinations and market/Connect event subscriptions
+- create Connect link tokens and read customer portfolio data
 - verify Rangler webhook signatures in a receiver
 
 It is designed to give you one integration surface across:
 
 - polling feeds
-- webhook delivery
-- developer control-plane operations
+- Connect data-plane workflows
+- webhook receivers
 
 ## Installation
 
@@ -44,10 +43,11 @@ pip install -e .[dev]
 For release builds:
 
 ```bash
-python scripts/update_version.py 0.1.4
+python scripts/update_version.py 0.1.5
 python -m unittest discover -s tests -v
 uv build --no-sources
-UV_PUBLISH_TOKEN=pypi-your-project-token uv publish
+export UV_PUBLISH_TOKEN=pypi-your-project-token
+uv publish --token "$UV_PUBLISH_TOKEN" dist/*
 ```
 
 For local checks with the PyPA tools:
@@ -102,29 +102,6 @@ async with AsyncRanglerClient(
         print(event.id, event.type)
 ```
 
-### Control plane: manage event destinations
-
-```python
-from ranglerpy import RanglerClient
-
-client = RanglerClient(
-    bearer_token="your_portal_bearer_token",
-    environment="live",
-)
-
-organization = client.organizations.create(
-    name="Rangler Demo Org",
-    billing_email="billing@example.com",
-)
-
-destination = client.event_destinations.create(
-    organization["id"],
-    url="https://example.com/rangler/webhooks",
-)
-
-print(destination["id"])
-```
-
 ### Data plane: Connect
 
 ```python
@@ -146,20 +123,6 @@ connections = client.connect.list_connections(client_user_id="customer_123")
 portfolio = client.connect.get_portfolio(client_user_id="customer_123")
 
 print(link_token["link_token"], len(connections["data"]), portfolio["totals"])
-```
-
-### Control plane: Connect subscriptions
-
-```python
-subscription = client.subscriptions.create_connect(
-    organization["id"],
-    destination_id=destination["id"],
-    name="All Connect events",
-    event_types=["connect.sync.completed", "connect.item.login_required"],
-    environment="live",
-)
-
-print(subscription["id"])
 ```
 
 ### Webhook verification
@@ -239,14 +202,9 @@ def rangler_webhook():
     return jsonify({"received": event.id})
 ```
 
-## Authentication modes
+## Authentication
 
-Rangler has two auth modes:
-
-- data plane uses `X-API-Key`
-- developer control plane uses `Authorization: Bearer ...`
-
-`ranglerpy` supports both on the same client. Resource methods choose the correct auth mode internally.
+`ranglerpy` uses `X-API-Key` authentication for public API operations.
 
 ## Current SDK scope
 
@@ -257,16 +215,6 @@ Rangler has two auth modes:
 - filings
 - funds
 - event feeds
-
-### Control plane
-
-- organizations
-- API keys
-- usage and billing status
-- event destinations
-- webhook deliveries
-- market event subscriptions
-- Connect event subscriptions
 
 ### Helpers
 

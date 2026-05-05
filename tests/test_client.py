@@ -64,51 +64,29 @@ class RanglerClientTests(unittest.TestCase):
         client = RanglerClient(api_key="rgl_test_123", environment="sandbox")
         try:
             self.assertEqual(client.base_url, "https://sandbox-api.rangler.co/v1")
-            self.assertEqual(client.developer_base_url, "https://sandbox-api.rangler.co/developer/v1")
             self.assertEqual(client.api_version, "v1")
             self.assertEqual(client._http.headers["User-Agent"], f"ranglerpy/{__version__}")
             self.assertEqual(client._http.headers["Rangler-Version"], "v1")
             self.assertTrue(hasattr(client, "funds"))
             self.assertTrue(hasattr(client, "connect"))
-            self.assertTrue(hasattr(client, "event_destinations"))
+            self.assertFalse(hasattr(client, "event_destinations"))
+            self.assertFalse(hasattr(client, "organizations"))
+            self.assertFalse(hasattr(client, "api_keys"))
+            self.assertFalse(hasattr(client, "usage"))
+            self.assertFalse(hasattr(client, "subscriptions"))
             self.assertIs(client.v1.events, client.events)
             self.assertIs(client.v1.companies, client.companies)
             self.assertIs(client.v1.connect, client.connect)
-            self.assertIs(client.v1.event_destinations, client.event_destinations)
             self.assertFalse(hasattr(client, "webhooks"))
         finally:
             client.close()
 
-    def test_client_allows_explicit_developer_base_url(self) -> None:
-        client = RanglerClient(
-            base_url="http://localhost:8000/v1",
-            developer_base_url="http://localhost:8000/developer/v1",
-        )
-        try:
-            self.assertEqual(client.developer_base_url, "http://localhost:8000/developer/v1")
-        finally:
-            client.close()
-
-    def test_bearer_auth_requirement_is_enforced(self) -> None:
+    def test_api_key_auth_requirement_is_enforced(self) -> None:
         client = RanglerClient(api_key="rgl_test_123")
         try:
+            client.api_key = None
             with self.assertRaises(AuthenticationError):
-                client._build_auth_headers("bearer")
-        finally:
-            client.close()
-
-    def test_bearer_requests_use_developer_base_url(self) -> None:
-        client = RanglerClient(bearer_token="portal-token")
-        try:
-            client.request("GET", "/organizations", auth="bearer")
-            self.assertEqual(
-                client._http.requests[0]["kwargs"]["url"],
-                "https://api.rangler.co/developer/v1/organizations",
-            )
-            self.assertEqual(
-                client._http.requests[0]["kwargs"]["headers"],
-                {"Authorization": "Bearer portal-token"},
-            )
+                client._build_auth_headers("api_key")
         finally:
             client.close()
 
@@ -124,16 +102,18 @@ class RanglerClientTests(unittest.TestCase):
     def test_async_client_uses_sandbox_base_url(self) -> None:
         client = AsyncRanglerClient(api_key="rgl_test_123", environment="sandbox")
         self.assertEqual(client.base_url, "https://sandbox-api.rangler.co/v1")
-        self.assertEqual(client.developer_base_url, "https://sandbox-api.rangler.co/developer/v1")
         self.assertEqual(client.api_version, "v1")
         self.assertEqual(client._http.headers["User-Agent"], f"ranglerpy/{__version__}")
         self.assertEqual(client._http.headers["Rangler-Version"], "v1")
         self.assertTrue(hasattr(client, "funds"))
         self.assertTrue(hasattr(client, "connect"))
-        self.assertTrue(hasattr(client, "event_destinations"))
+        self.assertFalse(hasattr(client, "event_destinations"))
+        self.assertFalse(hasattr(client, "organizations"))
+        self.assertFalse(hasattr(client, "api_keys"))
+        self.assertFalse(hasattr(client, "usage"))
+        self.assertFalse(hasattr(client, "subscriptions"))
         self.assertIs(client.v1.events, client.events)
         self.assertIs(client.v1.connect, client.connect)
-        self.assertIs(client.v1.event_destinations, client.event_destinations)
         self.assertFalse(hasattr(client, "webhooks"))
 
     def test_client_allows_custom_api_version_header(self) -> None:
