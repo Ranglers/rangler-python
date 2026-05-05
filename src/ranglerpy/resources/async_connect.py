@@ -53,25 +53,11 @@ class AsyncConnectResource(AsyncBaseResource):
             auth="api_key",
         )
 
-    async def list_developer_institutions(self, organization_id: str, *, environment: str = "live") -> Any:
-        return await self._get(
-            f"/organizations/{organization_id}/connect/institutions",
-            params={"environment": environment},
-            auth="bearer",
-        )
-
     async def list_connections(self, *, client_user_id: str | None = None) -> Any:
         return await self._get(
             "/connect/connections",
             params=compact_dict({"client_user_id": client_user_id}),
             auth="api_key",
-        )
-
-    async def list_developer_connections(self, organization_id: str, *, environment: str = "live") -> Any:
-        return await self._get(
-            f"/organizations/{organization_id}/connect/connections",
-            params={"environment": environment},
-            auth="bearer",
         )
 
     async def get_portfolio(self, *, client_user_id: str) -> Any:

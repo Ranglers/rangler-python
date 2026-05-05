@@ -262,7 +262,6 @@ Rangler has two auth modes:
 
 - organizations
 - API keys
-- Connect institutions and connections for an organization
 - usage and billing status
 - event destinations
 - webhook deliveries

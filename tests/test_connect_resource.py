@@ -175,36 +175,6 @@ class ConnectResourceTests(unittest.TestCase):
             ],
         )
 
-    def test_developer_connection_resource_paths(self) -> None:
-        client = _Client()
-        resource = ConnectResource(client)
-
-        resource.list_developer_institutions("org_123", environment="test")
-        resource.list_developer_connections("org_123")
-
-        self.assertEqual(
-            client.calls,
-            [
-                {
-                    "method": "GET",
-                    "path": "/organizations/org_123/connect/institutions",
-                    "auth": "bearer",
-                    "params": {"environment": "test"},
-                    "json": None,
-                    "headers": None,
-                },
-                {
-                    "method": "GET",
-                    "path": "/organizations/org_123/connect/connections",
-                    "auth": "bearer",
-                    "params": {"environment": "live"},
-                    "json": None,
-                    "headers": None,
-                },
-            ],
-        )
-
-
 class AsyncConnectResourceTests(unittest.IsolatedAsyncioTestCase):
     async def test_async_create_link_token_payload(self) -> None:
         client = _AsyncClient()
@@ -232,36 +202,6 @@ class AsyncConnectResourceTests(unittest.IsolatedAsyncioTestCase):
                 }
             ],
         )
-
-    async def test_async_developer_connection_resource_paths(self) -> None:
-        client = _AsyncClient()
-        resource = AsyncConnectResource(client)
-
-        await resource.list_developer_institutions("org_123", environment="test")
-        await resource.list_developer_connections("org_123")
-
-        self.assertEqual(
-            client.calls,
-            [
-                {
-                    "method": "GET",
-                    "path": "/organizations/org_123/connect/institutions",
-                    "auth": "bearer",
-                    "params": {"environment": "test"},
-                    "json": None,
-                    "headers": None,
-                },
-                {
-                    "method": "GET",
-                    "path": "/organizations/org_123/connect/connections",
-                    "auth": "bearer",
-                    "params": {"environment": "live"},
-                    "json": None,
-                    "headers": None,
-                },
-            ],
-        )
-
 
 if __name__ == "__main__":
     unittest.main()

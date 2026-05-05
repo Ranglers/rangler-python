@@ -53,25 +53,11 @@ class ConnectResource(BaseResource):
             auth="api_key",
         )
 
-    def list_developer_institutions(self, organization_id: str, *, environment: str = "live") -> Any:
-        return self._get(
-            f"/organizations/{organization_id}/connect/institutions",
-            params={"environment": environment},
-            auth="bearer",
-        )
-
     def list_connections(self, *, client_user_id: str | None = None) -> Any:
         return self._get(
             "/connect/connections",
             params=compact_dict({"client_user_id": client_user_id}),
             auth="api_key",
-        )
-
-    def list_developer_connections(self, organization_id: str, *, environment: str = "live") -> Any:
-        return self._get(
-            f"/organizations/{organization_id}/connect/connections",
-            params={"environment": environment},
-            auth="bearer",
         )
 
     def get_portfolio(self, *, client_user_id: str) -> Any:
